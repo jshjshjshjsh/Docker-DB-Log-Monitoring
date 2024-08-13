@@ -1,11 +1,9 @@
-version: "3.8"
-
 services:
   oracle:
     image: oracleinanutshell/oracle-xe-11g
     container_name: oracle
     hostname: oracle
-    restart: always
+    restart: on-failure
     ports:
       - "1522:1522"
       - "8080:8080" # Oracle Enterprise Manager HTTP port
@@ -18,20 +16,37 @@ services:
       - oradata:/oradata/orcl
     networks:
       - oracle-network
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 120s
 
   grafana:
     image: grafana/grafana:10.2.0
     container_name: grafana
+    restart: on-failure
     ports:
       - "3000:3000"
+    volumes:
+      - C:/Users/User/AppData/Local/Docker/wsl/data/grafana:/var/lib/grafana
     networks:
       - oracle-network
     depends_on:
       - oracle
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 120s
+  # 3333 import dashboard template
 
   oracledb_exporter:
     image: iamseth/oracledb_exporter
     container_name: oracledb_exporter
+    restart: on-failure
     ports:
       - "9161:9161"
     environment:
@@ -40,16 +55,29 @@ services:
       - oracle-network
     depends_on:
       - oracle
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 120s
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    restart: on-failure
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
       - oracle-network
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 120s
 volumes:
   oradata:
 
