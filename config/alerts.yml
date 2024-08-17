@@ -1,0 +1,77 @@
+groups:
+  - name: example_alerts
+    rules:
+      # CPU 사용량이 높은 경우 알람 (기준: 80%)
+      - alert: HighCpuUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 1m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Instance {{ $labels.instance }} has high CPU usage"
+          description: "CPU usage on instance {{ $labels.instance }} is above 80% for more than 1 minute. Current value: {{ $value }}%"
+
+      # 메모리 사용량이 높은 경우 알람 (기준: 80%)
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Instance {{ $labels.instance }} has high memory usage"
+          description: "Memory usage on instance {{ $labels.instance }} is above 80% for more than 2 minutes. Current value: {{ $value }}%"
+
+      # 인스턴스 다운 시 알람
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Instance {{ $labels.instance }} is down"
+          description: "Instance {{ $labels.instance }} has been down for more than 1 minutes."
+
+  - name: performance_alerts
+    rules:
+      # 응답 시간이 1초를 초과하면 알람 발생
+      - alert: HighResponseTime
+        expr: (rate(http_request_duration_seconds_sum{job="oracledb_exporter"}[5m]) / rate(http_request_duration_seconds_count{job="oracledb_exporter"}[5m])) > 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High response time detected"
+          description: "The average response time has exceeded 1 second for the past 1 minute."
+
+      # 캐시 사용량이 80%를 초과하면 알람 발생
+      - alert: HighCacheUsage
+        expr: (redis_memory_used_bytes{job="oracledb_exporter"} / redis_memory_max_bytes{job="oracledb_exporter"}) > 0.8
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High cache usage detected"
+          description: "The cache usage has exceeded 80% for the past 2 minutes."
+
+      # # 예를 들어, 쿼리 수가 특정 기준을 초과하면 알람 발생
+      # - alert: HighQueryCount
+      #   expr: oracledb_exporter_sql_queries_total{job="oracledb_exporter"} > 1000
+      #   for: 1m
+      #   labels:
+      #     severity: critical
+      #   annotations:
+      #     summary: "High query count detected"
+      #     description: "The number of SQL queries has exceeded 1000 in the past 1 minute."
+
+      # # 또는, 데이터베이스 연결 수가 특정 기준을 초과하면 알람 발생
+      # - alert: HighDbConnections
+      #   expr: oracledb_exporter_db_connections{job="oracledb_exporter"} > 500
+      #   for: 2m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High number of database connections detected"
+      #     description: "The number of database connections has exceeded 500 in the past 2 minutes."

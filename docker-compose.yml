@@ -1,7 +1,9 @@
+version: '3.8'
+
 services:
   oracle:
     image: oracleinanutshell/oracle-xe-11g
-    container_name: oracle
+    container_name: ksu-db-cms-oracle
     hostname: oracle
     restart: on-failure
     ports:
@@ -15,7 +17,67 @@ services:
     volumes:
       - oradata:/oradata/orcl
     networks:
-      - oracle-network
+      - monitoring-network
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 120s
+
+  loki:
+    image: grafana/loki:2.9.1
+    container_name: ksu-db-cms-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki-config.yml:/etc/loki/local-config.yaml
+      - /docker/data/loki/index:/loki/index
+      - /docker/data/loki/chunks:/loki/chunks
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monitoring-network
+    user: "0"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ksu-db-cms-prometheus
+    restart: on-failure
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus-config.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - monitoring-network
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 120s
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: ksu-db-cms-alertmanager
+    networks:
+      - monitoring-network
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./config/alertmanager-config.yml:/etc/alertmanager/alertmanager.yml
+
+  oracledb_exporter:
+    image: iamseth/oracledb_exporter
+    container_name: ksu-db-cms-oracledb_exporter
+    restart: on-failure
+    ports:
+      - "9161:9161"
+    environment:
+      - DATA_SOURCE_NAME=system/oracle@oracle:1522/XE
+    networks:
+      - monitoring-network
+    depends_on:
+      - oracle
     deploy:
       restart_policy:
         condition: on-failure
@@ -25,63 +87,25 @@ services:
 
   grafana:
     image: grafana/grafana:10.2.0
-    container_name: grafana
-    restart: on-failure
+    container_name: ksu-db-cms-grafana
     ports:
       - "3000:3000"
     volumes:
-      - C:/Users/User/AppData/Local/Docker/wsl/data/grafana:/var/lib/grafana
+      - /docker/data/grafana:/var/lib/grafana
+      #- C:/Users/User/AppData/Local/Docker/wsl/data/grafana:/var/lib/grafana
     networks:
-      - oracle-network
-    depends_on:
-      - oracle
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 10
-        window: 120s
-  # 3333 import dashboard template
-
-  oracledb_exporter:
-    image: iamseth/oracledb_exporter
-    container_name: oracledb_exporter
-    restart: on-failure
-    ports:
-      - "9161:9161"
+      - monitoring-network
     environment:
-      - DATA_SOURCE_NAME=system/oracle@oracle:1522/XE
-    networks:
-      - oracle-network
+      - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
-      - oracle
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 10
-        window: 120s
+      - loki
+      - prometheus
+      - alertmanager
 
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    restart: on-failure
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    networks:
-      - oracle-network
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 10
-        window: 120s
 volumes:
   oradata:
 
 
 networks:
-  oracle-network:
+  monitoring-network:
     driver: bridge
